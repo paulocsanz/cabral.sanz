@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Paulo Cabral Sanz</title>
+    <meta
+      name="description"
+      content="Paulo Cabral Sanz — engenheiro na Railway."
+    />
+    <meta name="theme-color" content="#11100e" />
+    <meta name="color-scheme" content="dark" />
+    <link rel="canonical" href="https://cabralsanz.up.railway.app/" />
+
+    <meta property="og:title" content="Paulo Cabral Sanz" />
+    <meta
+      property="og:description"
+      content="Engenheiro na Railway."
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://cabralsanz.up.railway.app/" />
+    <meta property="og:locale" content="pt_BR" />
+    <meta property="og:locale:alternate" content="en" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="Paulo Cabral Sanz" />
+    <meta
+      name="twitter:description"
+      content="Engenheiro na Railway."
+    />
+
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/styles.css" />
+    <script>
+      (function () {
+        try {
+          var saved = localStorage.getItem("lang");
+          var lang = saved === "en" || saved === "pt" ? saved : null;
+          if (!lang) {
+            var list =
+              navigator.languages && navigator.languages.length
+                ? navigator.languages
+                : [navigator.language];
+            for (var i = 0; i < list.length; i++) {
+              var code = String(list[i] || "").toLowerCase();
+              if (code.indexOf("pt") === 0) {
+                lang = "pt";
+                break;
+              }
+              if (code.indexOf("en") === 0) {
+                lang = "en";
+                break;
+              }
+            }
+          }
+          document.documentElement.lang = lang === "en" ? "en" : "pt-BR";
+        } catch (e) {}
+      })();
+    </script>
+  </head>
+  <body>
+    <div class="noise" aria-hidden="true"></div>
+    <div class="rails" aria-hidden="true"></div>
+
+    <a class="skip" href="#conteudo">
+      <span class="t-pt">Pular para o conteúdo</span>
+      <span class="t-en">Skip to content</span>
+    </a>
+
+    <header class="top">
+      <p class="mark">cabral.sanz</p>
+      <div class="top-end">
+        <p class="place">Rio de Janeiro</p>
+        <div class="langs" role="group" aria-label="Idioma">
+          <button
+            type="button"
+            data-lang="pt"
+            aria-pressed="true"
+            aria-label="Português"
+            title="Português"
+          >
+            <svg viewBox="0 0 28 20" aria-hidden="true">
+              <rect width="28" height="20" fill="#009b3a" />
+              <polygon points="14,2.2 25.5,10 14,17.8 2.5,10" fill="#fedf00" />
+              <circle cx="14" cy="10" r="3.6" fill="#002776" />
+            </svg>
+          </button>
+          <button
+            type="button"
+            data-lang="en"
+            aria-pressed="false"
+            aria-label="English"
+            title="English"
+          >
+            <svg viewBox="0 0 60 30" aria-hidden="true">
+              <rect width="60" height="30" fill="#012169" />
+              <path
+                d="M0,0 60,30 M60,0 0,30"
+                stroke="#fff"
+                stroke-width="6"
+              />
+              <path
+                d="M0,0 60,30 M60,0 0,30"
+                stroke="#c8102e"
+                stroke-width="2"
+              />
+              <path d="M30,0 V30 M0,15 H60" stroke="#fff" stroke-width="10" />
+              <path
+                d="M30,0 V30 M0,15 H60"
+                stroke="#c8102e"
+                stroke-width="6"
+              />
+            </svg>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <main id="conteudo">
+      <p class="kicker">
+        <span class="t-pt">Oi, sou</span>
+        <span class="t-en">Hi, I&rsquo;m</span>
+      </p>
+      <h1>
+        <span class="given">Paulo</span>
+        <span class="family">Cabral Sanz</span>
+      </h1>
+      <p class="role">
+        <span class="t-pt">engenheiro na</span>
+        <span class="t-en">engineer at</span>
+        <a class="railway" href="https://railway.com" rel="noreferrer">Railway</a>
+      </p>
+    </main>
+
+    <nav class="links" aria-labelledby="links-label">
+      <span id="links-label" class="visually-hidden">
+        <span class="t-pt">Contato</span>
+        <span class="t-en">Contact</span>
+      </span>
+      <a href="https://github.com/paulocsanz" rel="noreferrer">GitHub</a>
+      <a href="https://www.linkedin.com/in/paulo-cabral-sanz/" rel="noreferrer"
+        >LinkedIn</a
+      >
+    </nav>
+    <script src="/lang.js"></script>
+  </body>
+</html>

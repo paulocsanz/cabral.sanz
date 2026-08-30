@@ -1,0 +1,8 @@
+{
+  "name": "cabral.sanz",
+  "private": true,
+  "description": "Site pessoal de Paulo Cabral Sanz",
+  "devDependencies": {
+    "railway": "^3.11.0"
+  }
+}
