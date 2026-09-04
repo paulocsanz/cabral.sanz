@@ -168,7 +168,7 @@ html:not([lang="en"]) .t-en {
   display: none !important;
 }
 
-main {
+body:not(.admin-body) main {
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -184,7 +184,7 @@ main {
   color: var(--accent);
 }
 
-h1 {
+body:not(.admin-body) h1 {
   margin: 0;
   font-weight: 400;
   font-size: clamp(3.4rem, 12vw, 8.5rem);
@@ -192,7 +192,7 @@ h1 {
   letter-spacing: -0.045em;
 }
 
-h1 span {
+body:not(.admin-body) h1 span {
   display: block;
 }
 
@@ -249,7 +249,7 @@ h1 span {
     white-space: normal;
   }
 
-  main {
+  body:not(.admin-body) main {
     max-width: none;
     padding-bottom: 2rem;
   }
@@ -528,226 +528,4 @@ h1 span {
   .railway {
     color: #111;
   }
-}
-
-/* Admin */
-
-.admin-body {
-  min-height: 100dvh;
-}
-
-.admin-main {
-  max-width: 52rem;
-  margin: 0 auto;
-  padding: 4rem 1.25rem 6rem;
-}
-
-#view-login {
-  max-width: 24rem;
-}
-
-.admin-title {
-  font-weight: 400;
-  font-size: clamp(1.8rem, 4vw, 2.4rem);
-  letter-spacing: -0.03em;
-  margin: 0.2rem 0 1.2rem;
-}
-
-.admin-form {
-  display: grid;
-  gap: 0.9rem;
-  max-width: 26rem;
-}
-
-.admin-editor {
-  max-width: none;
-}
-
-.admin-row,
-.admin-bilingual {
-  display: grid;
-  gap: 0.9rem;
-}
-
-.admin-row {
-  grid-template-columns: 1fr 10rem;
-}
-
-@media (min-width: 800px) {
-  .admin-bilingual {
-    grid-template-columns: 1fr 1fr;
-  }
-}
-
-@media (max-width: 640px) {
-  .admin-row {
-    grid-template-columns: 1fr;
-  }
-}
-
-.admin-form label {
-  display: grid;
-  gap: 0.35rem;
-  font-size: 0.85rem;
-  opacity: 0.9;
-}
-
-.admin-form input,
-.admin-form textarea {
-  font: inherit;
-  color: inherit;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 6px;
-  padding: 0.5rem 0.65rem;
-}
-
-.admin-form input:focus-visible,
-.admin-form textarea:focus-visible {
-  outline: 2px solid currentColor;
-  outline-offset: 1px;
-}
-
-.admin-form input:disabled {
-  opacity: 0.55;
-}
-
-.admin-form textarea {
-  font-family: ui-monospace, "SF Mono", Menlo, monospace;
-  font-size: 0.85rem;
-  line-height: 1.5;
-  resize: vertical;
-}
-
-.admin-btn {
-  font: inherit;
-  font-size: 0.9rem;
-  color: #11100e;
-  background: #f3eee4;
-  border: 1px solid transparent;
-  border-radius: 999px;
-  padding: 0.45rem 1.1rem;
-  cursor: pointer;
-  text-decoration: none;
-  display: inline-block;
-}
-
-.admin-btn:hover {
-  background: #fff;
-}
-
-.admin-btn-ghost {
-  background: transparent;
-  color: inherit;
-  border-color: rgba(255, 255, 255, 0.25);
-}
-
-.admin-btn-ghost:hover {
-  background: rgba(255, 255, 255, 0.06);
-}
-
-.admin-btn-danger {
-  background: transparent;
-  color: #e88;
-  border-color: rgba(238, 136, 136, 0.4);
-}
-
-.admin-btn-danger:hover {
-  background: rgba(238, 136, 136, 0.1);
-}
-
-.admin-btn-publish {
-  background: var(--accent);
-  color: #11100e;
-}
-
-.admin-btn-publish:hover {
-  background: #e07a48;
-}
-
-.admin-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-end;
-  gap: 1rem;
-  flex-wrap: wrap;
-}
-
-.admin-actions {
-  display: flex;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-}
-
-.admin-note {
-  font-size: 0.85rem;
-  opacity: 0.75;
-  margin: 0.8rem 0 1.4rem;
-}
-
-.admin-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  gap: 0.5rem;
-}
-
-.admin-item {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  flex-wrap: wrap;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 8px;
-  padding: 0.65rem 0.9rem;
-}
-
-.admin-item-title {
-  flex: 1;
-  min-width: 12rem;
-}
-
-.admin-item-meta {
-  font-size: 0.8rem;
-  opacity: 0.7;
-  display: flex;
-  align-items: center;
-  gap: 0.35rem;
-}
-
-.admin-badge {
-  font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
-  font-size: 0.68rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  padding: 0.12rem 0.45rem;
-  border-radius: 999px;
-  border: 1px solid var(--line);
-}
-
-.admin-badge-draft {
-  color: var(--accent);
-  border-color: rgba(210, 106, 58, 0.55);
-}
-
-.admin-badge-live {
-  color: #8c8;
-  border-color: rgba(136, 204, 136, 0.45);
-}
-
-.admin-empty {
-  font-size: 0.95rem;
-  opacity: 0.7;
-  margin: 0.4rem 0 0;
-}
-
-.admin-error {
-  color: #e88;
-  font-size: 0.85rem;
-}
-
-.admin-ok {
-  color: #8c8;
-  font-size: 0.85rem;
 }

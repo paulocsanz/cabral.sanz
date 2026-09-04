@@ -378,9 +378,12 @@ function serveStatic(req, res, pathname) {
     stat = fs.statSync(resolved, { throwIfNoEntry: false });
   }
   if (!stat || !stat.isFile()) return sendHtml(res, 404, renderNotFound());
+  const ext = path.extname(resolved);
   res.writeHead(200, {
-    "Content-Type": MIME[path.extname(resolved)] || "application/octet-stream",
+    "Content-Type": MIME[ext] || "application/octet-stream",
     "Content-Length": stat.size,
+    "Last-Modified": stat.mtime.toUTCString(),
+    "Cache-Control": ext === ".html" || ext === ".css" ? "no-cache" : "public, max-age=86400",
   });
   fs.createReadStream(resolved).pipe(res);
 }
