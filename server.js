@@ -9,13 +9,17 @@ const http = require("http");
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
+const { markdownToHtml, toMarkdown } = require("./lib/markdown");
+const docs = require("./lib/docs");
 
 const PORT = Number(process.env.PORT) || 3000;
 const ROOT = __dirname;
+const DATA_DIR = process.env.DATA_DIR || path.join(ROOT, "data");
 const SEED_FILE = path.join(ROOT, "data", "posts.json");
-const DATA_FILE = path.join(process.env.DATA_DIR || path.join(ROOT, "data"), "posts.json");
+const DATA_FILE = path.join(DATA_DIR, "posts.json");
 const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
-const MAX_BODY = 512 * 1024;
+const MAX_BODY = 2 * 1024 * 1024;
+const LANGS = new Set(["pt", "en"]);
 const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || null;
@@ -41,6 +45,19 @@ function parseCookies(req) {
     out[part.slice(0, idx).trim()] = decodeURIComponent(part.slice(idx + 1).trim());
   }
   return out;
+}
+
+function bearerPassword(req) {
+  const auth = String(req.headers.authorization || "");
+  if (auth.toLowerCase().startsWith("bearer ")) return auth.slice(7).trim();
+  return String(req.headers["x-admin-password"] || "").trim();
+}
+
+function isAuthed(req) {
+  if (currentSession(req)) return true;
+  if (!ADMIN_PASSWORD) return false;
+  const token = bearerPassword(req);
+  return token ? timingSafeEqualStr(token, ADMIN_PASSWORD) : false;
 }
 
 function currentSession(req) {
@@ -129,10 +146,24 @@ function publicPosts(posts) {
   return sortedPosts(posts.filter((p) => !p.draft));
 }
 
+function bodyMarkdown(post, lang) {
+  const fallback = lang === "en" ? post.bodyEn : post.bodyPt;
+  return docs.load(DATA_DIR, post.slug, lang, fallback).text();
+}
+
 function isPublishable(post) {
-  return ["titlePt", "titleEn", "bodyPt", "bodyEn", "date"].every(
-    (field) => typeof post[field] === "string" && post[field].trim() !== "",
+  return (
+    typeof post.titlePt === "string" &&
+    post.titlePt.trim() !== "" &&
+    typeof post.titleEn === "string" &&
+    post.titleEn.trim() !== "" &&
+    bodyMarkdown(post, "pt").trim() !== "" &&
+    bodyMarkdown(post, "en").trim() !== ""
   );
+}
+
+function renderBody(src) {
+  return markdownToHtml(toMarkdown(src || ""));
 }
 
 function escapeHtml(s) {
@@ -311,10 +342,10 @@ function renderPost(post) {
 
       <div class="post-body">
         <div class="t-pt">
-${post.bodyPt}
+${renderBody(bodyMarkdown(post, "pt") || post.bodyPt)}
         </div>
         <div class="t-en">
-${post.bodyEn}
+${renderBody(bodyMarkdown(post, "en") || post.bodyEn)}
         </div>
       </div>`;
 
@@ -467,13 +498,102 @@ async function handleApi(req, res, pathname) {
     return sendJson(res, 200, { authenticated: Boolean(currentSession(req)) });
   }
 
-  if (!currentSession(req)) return sendJson(res, 401, { error: "Não autenticado." });
+  if (req.method === "GET" && (sub === "" || sub === "/" || sub === "/llm")) {
+    if (!isAuthed(req)) return sendJson(res, 401, { error: "Não autenticado." });
+    return sendJson(res, 200, {
+      auth: "Cookie admin_session ou Authorization: Bearer $ADMIN_PASSWORD",
+      list: "GET /admin/api/posts",
+      create: "POST /admin/api/posts { slug, date, titlePt, titleEn, bodyPt?, bodyEn?, draft? }",
+      meta: "PUT /admin/api/posts/:slug { date?, titlePt?, titleEn?, draft? }",
+      publish: "POST /admin/api/posts/:slug/publish",
+      unpublish: "POST /admin/api/posts/:slug/unpublish",
+      delete: "DELETE /admin/api/posts/:slug",
+      doc: "GET/PUT /admin/api/posts/:slug/doc/:lang  lang=pt|en  PUT { markdown }",
+      ops: "POST /admin/api/posts/:slug/doc/:lang/ops  { replica, ops }",
+      patch: "POST /admin/api/posts/:slug/doc/:lang/patch  { find, replace, all? } | { markdown } | { start, end, text }",
+    });
+  }
+
+  if (!isAuthed(req)) {
+    if (bearerPassword(req)) recordFailure(ip);
+    return sendJson(res, 401, { error: "Não autenticado." });
+  }
 
   if (req.method === "GET" && sub === "/posts") {
     return sendJson(res, 200, { posts: sortedPosts(loadPosts()) });
   }
 
-  let match = sub.match(/^\/posts\/([a-z0-9-]+)\/(publish|unpublish)$/);
+  let match = sub.match(/^\/posts\/([a-z0-9-]+)\/doc\/(pt|en)(?:\/(ops|patch))?$/);
+  if (match) {
+    const slug = match[1];
+    const lang = match[2];
+    const action = match[3] || "";
+    return withStore(async () => {
+      const posts = loadPosts();
+      const post = findPost(posts, slug);
+      if (!post) return sendJson(res, 404, { error: "Post não encontrado." });
+      const fallback = lang === "en" ? post.bodyEn : post.bodyPt;
+      const doc = docs.load(DATA_DIR, slug, lang, fallback);
+
+      if (req.method === "GET" && !action) {
+        return sendJson(res, 200, docs.payload(doc));
+      }
+
+      let payload;
+      try {
+        payload = JSON.parse(await readBody(req));
+      } catch {
+        return sendJson(res, 400, { error: "JSON inválido" });
+      }
+
+      if (req.method === "PUT" && !action) {
+        if (typeof payload.markdown !== "string") return sendJson(res, 400, { error: "markdown ausente" });
+        doc.setText(payload.markdown);
+        docs.save(DATA_DIR, slug, lang, doc);
+        if (lang === "pt") post.bodyPt = doc.text();
+        else post.bodyEn = doc.text();
+        savePosts(posts);
+        return sendJson(res, 200, docs.payload(doc));
+      }
+
+      if (req.method === "POST" && action === "ops") {
+        if (!Array.isArray(payload.ops)) return sendJson(res, 400, { error: "ops deve ser array" });
+        doc.apply(payload.ops);
+        docs.save(DATA_DIR, slug, lang, doc);
+        if (lang === "pt") post.bodyPt = doc.text();
+        else post.bodyEn = doc.text();
+        savePosts(posts);
+        return sendJson(res, 200, docs.payload(doc));
+      }
+
+      if (req.method === "POST" && action === "patch") {
+        let next = doc.text();
+        if (typeof payload.markdown === "string") next = payload.markdown;
+        else if (typeof payload.find === "string") {
+          if (!payload.find) return sendJson(res, 400, { error: "find vazio" });
+          const repl = payload.replace == null ? "" : String(payload.replace);
+          next = payload.all ? next.split(payload.find).join(repl) : next.replace(payload.find, repl);
+          if (next === doc.text() && !payload.allowMissing) {
+            return sendJson(res, 404, { error: "trecho não encontrado" });
+          }
+        } else if (typeof payload.start === "number" && typeof payload.end === "number") {
+          next = next.slice(0, payload.start) + String(payload.text || "") + next.slice(payload.end);
+        } else {
+          return sendJson(res, 400, { error: "informe markdown, find/replace ou start/end/text" });
+        }
+        doc.setText(next);
+        docs.save(DATA_DIR, slug, lang, doc);
+        if (lang === "pt") post.bodyPt = doc.text();
+        else post.bodyEn = doc.text();
+        savePosts(posts);
+        return sendJson(res, 200, docs.payload(doc));
+      }
+
+      return sendJson(res, 405, { error: "Método não permitido." });
+    });
+  }
+
+  match = sub.match(/^\/posts\/([a-z0-9-]+)\/(publish|unpublish)$/);
   if (match && req.method === "POST") {
     const slug = match[1];
     const action = match[2];
@@ -531,6 +651,7 @@ async function handleApi(req, res, pathname) {
 
       if (req.method === "DELETE") {
         if (!post) return sendJson(res, 404, { error: "Post não encontrado." });
+        docs.remove(DATA_DIR, slug);
         savePosts(posts.filter((p) => p.slug !== slug));
         return sendJson(res, 200, { ok: true });
       }
@@ -562,6 +683,14 @@ async function handleApi(req, res, pathname) {
         bodyEn: payload.bodyEn || "",
       };
       posts.push(post);
+      const pt = docs.load(DATA_DIR, post.slug, "pt", post.bodyPt);
+      const en = docs.load(DATA_DIR, post.slug, "en", post.bodyEn);
+      if (post.bodyPt) pt.setText(toMarkdown(post.bodyPt));
+      if (post.bodyEn) en.setText(toMarkdown(post.bodyEn));
+      docs.save(DATA_DIR, post.slug, "pt", pt);
+      docs.save(DATA_DIR, post.slug, "en", en);
+      post.bodyPt = pt.text();
+      post.bodyEn = en.text();
       savePosts(posts);
       return sendJson(res, 201, post);
     });

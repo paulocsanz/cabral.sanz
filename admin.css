@@ -236,3 +236,227 @@ a.admin-btn-ghost {
   color: #8c8;
   font-size: 0.85rem;
 }
+
+.admin-sync {
+  font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.55;
+}
+
+.ink-tabs {
+  display: flex;
+  gap: 0.35rem;
+  margin: 0.4rem 0 0.2rem;
+}
+
+.ink-tab {
+  appearance: none;
+  font: inherit;
+  font-size: 0.85rem;
+  color: inherit;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  padding: 0.3rem 0.85rem;
+  cursor: pointer;
+  opacity: 0.55;
+}
+
+.ink-tab.is-on {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.ink-host {
+  min-height: 22rem;
+}
+
+.ink-root {
+  --ink-accent: var(--accent, #d26a3a);
+  --ink-text: var(--ink, #f3eee4);
+  --ink-muted: var(--muted, #9a9488);
+  --ink-border: rgba(243, 238, 228, 0.14);
+  position: relative;
+  overflow: visible;
+  border: 1px solid var(--ink-border);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.ink-bar {
+  display: flex;
+  gap: 0.2rem;
+  align-items: center;
+  padding: 0.4rem 0.55rem;
+  border-bottom: 1px solid var(--ink-border);
+}
+
+.ink-bar-btn {
+  appearance: none;
+  font: inherit;
+  font-size: 0.8rem;
+  min-width: 1.7rem;
+  color: var(--ink-text);
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  padding: 0.25rem 0.4rem;
+  cursor: pointer;
+  opacity: 0.7;
+}
+
+.ink-bar-btn:hover {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.ink-bar-gap {
+  flex: 1;
+}
+
+.ink-surface {
+  padding: 0.9rem 1.1rem 2rem;
+  min-height: 20rem;
+}
+
+.ink-source {
+  display: block;
+  width: 100%;
+  min-height: 20rem;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.88rem;
+  line-height: 1.55;
+  padding: 1rem 1.1rem;
+  resize: vertical;
+}
+
+.ink-source[hidden],
+.ink-surface[hidden] {
+  display: none !important;
+}
+
+.ink-block {
+  margin: 0 0 0.35em;
+}
+
+.ink-block[data-type="h1"] .ink-edit {
+  font-size: 1.7em;
+  letter-spacing: -0.03em;
+  line-height: 1.2;
+}
+
+.ink-block[data-type="h2"] .ink-edit {
+  font-size: 1.35em;
+  letter-spacing: -0.02em;
+}
+
+.ink-block[data-type="h3"] .ink-edit {
+  font-size: 1.15em;
+}
+
+.ink-edit {
+  outline: none;
+  min-height: 1.35em;
+  line-height: 1.6;
+  font-size: 1.02rem;
+}
+
+.ink-edit:empty::before {
+  content: attr(data-placeholder);
+  color: var(--ink-muted);
+  opacity: 0.55;
+}
+
+.ink-block[data-type="quote"] {
+  border-left: 2px solid var(--ink-accent);
+  padding-left: 0.8rem;
+  color: var(--ink-muted);
+}
+
+.ink-block[data-type="code"] .ink-edit {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.88rem;
+  white-space: pre-wrap;
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 6px;
+  padding: 0.7rem 0.8rem;
+}
+
+.ink-block[data-type="ul"] .ink-edit,
+.ink-block[data-type="ol"] .ink-edit {
+  padding-left: 1.2rem;
+}
+
+.ink-block[data-type="ul"] .ink-edit::before,
+.ink-block[data-type="ol"] .ink-edit::before {
+  content: "•";
+  display: inline-block;
+  width: 1.2rem;
+  margin-left: -1.2rem;
+  color: var(--ink-muted);
+}
+
+.ink-block[data-type="ol"] .ink-edit::before {
+  content: "1.";
+  font-variant-numeric: tabular-nums;
+}
+
+.ink-hr {
+  height: 1px;
+  background: var(--ink-border);
+  margin: 1.1rem 0;
+}
+
+.ink-todo {
+  display: flex;
+  gap: 0.55rem;
+  align-items: flex-start;
+}
+
+.ink-todo .ink-edit {
+  flex: 1;
+}
+
+.ink-slash {
+  position: absolute;
+  left: 1.1rem;
+  z-index: 5;
+  min-width: 16rem;
+  background: #1a1916;
+  border: 1px solid var(--ink-border);
+  border-radius: 10px;
+  padding: 0.3rem;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+}
+
+.ink-slash-item {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  appearance: none;
+  font: inherit;
+  font-size: 0.88rem;
+  color: inherit;
+  background: transparent;
+  border: 0;
+  border-radius: 7px;
+  padding: 0.45rem 0.55rem;
+  cursor: pointer;
+  text-align: left;
+}
+
+.ink-slash-item kbd {
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 0.72rem;
+  opacity: 0.45;
+}
+
+.ink-slash-item.is-active,
+.ink-slash-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+}

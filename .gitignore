@@ -4,3 +4,5 @@ node_modules/
 .railway/*
 !.railway/railway.ts
 !.railway/README.md
+data/docs/
+data/*.tmp
