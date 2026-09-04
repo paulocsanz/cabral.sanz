@@ -310,9 +310,16 @@ html:not([lang="en"]) .t-en {
   display: flex;
   flex-direction: column;
   justify-content: flex-start;
+  align-items: center;
   max-width: none;
   width: 100%;
   padding: clamp(1rem, 5vh, 3rem) var(--pad) 3rem;
+}
+
+.blog-main > *,
+.post-main > * {
+  width: 100%;
+  max-width: 38rem;
 }
 
 .blog-title {
@@ -379,7 +386,6 @@ html:not([lang="en"]) .t-en {
   font-size: clamp(2.2rem, 6vw, 4rem);
   line-height: 0.95;
   letter-spacing: -0.035em;
-  max-width: min(18ch, 100%);
 }
 
 .post-meta {
@@ -399,12 +405,12 @@ html:not([lang="en"]) .t-en {
 }
 
 .post-body {
-  max-width: 38rem;
   margin-top: 2.5rem;
   font-size: 1.08rem;
   line-height: 1.65;
   letter-spacing: -0.005em;
   overflow-wrap: break-word;
+  text-align: left;
 }
 
 .post-body p {
