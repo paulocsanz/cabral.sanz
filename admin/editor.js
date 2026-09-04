@@ -1,4 +1,4 @@
-/* editor bloco estilo Notion / Inkwell: markdown é o modelo, atalhos + slash. */
+/* Um contenteditable só — seleção nativa, placeholder só com o doc vazio. */
 (function (global) {
   "use strict";
 
@@ -16,6 +16,7 @@
   ];
 
   function placeCaret(el, atEnd) {
+    if (!el) return;
     el.focus();
     var sel = window.getSelection();
     var range = document.createRange();
@@ -25,15 +26,10 @@
     sel.addRange(range);
   }
 
-  function blockText(block) {
-    if (block.dataset.type === "hr") return "";
-    var ed = block.querySelector(".ink-edit");
-    return ed ? ed.innerText.replace(/\u00a0/g, " ").replace(/\n$/, "") : "";
-  }
-
-  function setBlockText(block, text) {
-    var ed = block.querySelector(".ink-edit");
-    if (ed) ed.textContent = text;
+  function textOf(el) {
+    return String((el && el.innerText) || "")
+      .replace(/\u00a0/g, " ")
+      .replace(/\n$/, "");
   }
 
   function InkEditor(root, opts) {
@@ -62,21 +58,31 @@
       '<span class="ink-bar-gap"></span>' +
       '<button type="button" class="ink-bar-btn" data-act="source" title="Markdown fonte">MD</button>' +
       "</div>" +
-      '<div class="ink-surface"></div>' +
+      '<div class="ink-surface" contenteditable="true" spellcheck="true"></div>' +
       '<textarea class="ink-source" hidden spellcheck="false"></textarea>' +
       '<div class="ink-slash" hidden></div>';
     this.surface = this.root.querySelector(".ink-surface");
     this.source = this.root.querySelector(".ink-source");
     this.slashEl = this.root.querySelector(".ink-slash");
+    this.surface.dataset.placeholder = this.placeholder;
+    try {
+      document.execCommand("defaultParagraphSeparator", false, "p");
+    } catch (err) {}
     this.root.querySelector(".ink-bar").addEventListener("mousedown", function (e) {
       var btn = e.target.closest("[data-act]");
       if (!btn) return;
       e.preventDefault();
       self.toolbar(btn.getAttribute("data-act"));
     });
-    this.surface.addEventListener("keydown", function (e) { self.onKey(e); });
-    this.surface.addEventListener("input", function (e) { self.onInput(e); });
-    this.surface.addEventListener("paste", function (e) { self.onPaste(e); });
+    this.surface.addEventListener("keydown", function (e) {
+      self.onKey(e);
+    });
+    this.surface.addEventListener("input", function () {
+      self.onInput();
+    });
+    this.surface.addEventListener("paste", function (e) {
+      self.onPaste(e);
+    });
     this.source.addEventListener("input", function () {
       self.emit();
     });
@@ -88,6 +94,7 @@
       return;
     }
     if (this.mode === "source") return;
+    this.surface.focus();
     if (act === "link") {
       var url = window.prompt("URL");
       if (!url) return;
@@ -95,12 +102,11 @@
       this.emit();
       return;
     }
-    var cmd = { bold: "bold", italic: "italic", code: "insertHTML" }[act];
     if (act === "code") {
-      var sel = window.getSelection();
-      var t = sel.toString();
+      var t = window.getSelection().toString();
       document.execCommand("insertText", false, "`" + t + "`");
-    } else if (cmd) document.execCommand(cmd, false, null);
+    } else if (act === "bold") document.execCommand("bold", false, null);
+    else if (act === "italic") document.execCommand("italic", false, null);
     this.emit();
   };
 
@@ -120,27 +126,21 @@
     this.root.classList.toggle("ink-mode-source", this.mode === "source");
   };
 
-  InkEditor.prototype.addBlock = function (type, text, after) {
-    var block = document.createElement("div");
-    block.className = "ink-block";
-    block.dataset.type = type || "p";
-    if (type === "hr") {
-      block.innerHTML = '<div class="ink-hr" contenteditable="false"></div>';
-    } else if (type === "todo") {
-      block.innerHTML =
-        '<label class="ink-todo"><input type="checkbox" /><span class="ink-edit" contenteditable="true"></span></label>';
+  InkEditor.prototype.appendEl = function (tag, text, after) {
+    var el = document.createElement(tag);
+    if (tag === "hr") {
+      el.contentEditable = "false";
+    } else if (tag === "pre") {
+      el.textContent = text || "";
+    } else if (text) {
+      el.textContent = text;
     } else {
-      block.innerHTML = '<div class="ink-edit" contenteditable="true"></div>';
+      el.appendChild(document.createElement("br"));
     }
-    var ed = block.querySelector(".ink-edit");
-    if (ed) {
-      ed.dataset.placeholder = this.placeholder;
-      if (text) ed.textContent = text;
-    }
-    if (after && after.nextSibling) this.surface.insertBefore(block, after.nextSibling);
-    else if (after) this.surface.appendChild(block);
-    else this.surface.appendChild(block);
-    return block;
+    if (after && after.nextSibling) this.surface.insertBefore(el, after.nextSibling);
+    else if (after) this.surface.appendChild(el);
+    else this.surface.appendChild(el);
+    return el;
   };
 
   InkEditor.prototype.setMarkdown = function (md) {
@@ -148,60 +148,91 @@
     this.surface.innerHTML = "";
     var text = String(md || "").replace(/\r\n/g, "\n");
     if (!text.trim()) {
-      this.addBlock("p", "");
+      this.appendEl("p", "");
+      this.syncEmpty();
       this._building = false;
       return;
     }
     var lines = text.split("\n");
     var i = 0;
+    var ul = null;
+    var ol = null;
+    function closeLists() {
+      ul = null;
+      ol = null;
+    }
     while (i < lines.length) {
       var line = lines[i];
       if (/^```/.test(line)) {
+        closeLists();
         var buf = [];
         i += 1;
         while (i < lines.length && !/^```/.test(lines[i])) {
           buf.push(lines[i]);
           i += 1;
         }
-        this.addBlock("code", buf.join("\n"));
+        this.appendEl("pre", buf.join("\n"));
         i += 1;
         continue;
       }
       if (/^---\s*$/.test(line)) {
-        this.addBlock("hr", "");
+        closeLists();
+        this.appendEl("hr", "");
         i += 1;
         continue;
       }
       var h = /^(#{1,3})\s+(.*)$/.exec(line);
       if (h) {
-        this.addBlock("h" + h[1].length, h[2]);
+        closeLists();
+        this.appendEl("h" + h[1].length, h[2]);
         i += 1;
         continue;
       }
       if (/^>\s?/.test(line)) {
-        this.addBlock("quote", line.replace(/^>\s?/, ""));
+        closeLists();
+        this.appendEl("blockquote", line.replace(/^>\s?/, ""));
         i += 1;
         continue;
       }
-      if (/^\s*[-*+]\s+\[ \]\s+/.test(line)) {
-        this.addBlock("todo", line.replace(/^\s*[-*+]\s+\[ \]\s+/, ""));
-        i += 1;
-        continue;
-      }
-      if (/^\s*[-*+]\s+\[x\]\s+/i.test(line)) {
-        var tb = this.addBlock("todo", line.replace(/^\s*[-*+]\s+\[[xX]\]\s+/, ""));
-        var ck = tb.querySelector("input");
-        if (ck) ck.checked = true;
+      var todo = /^\s*[-*+]\s+\[([ xX])\]\s+(.*)$/.exec(line);
+      if (todo) {
+        closeLists();
+        var tlist = document.createElement("ul");
+        tlist.dataset.todo = "1";
+        var tli = document.createElement("li");
+        var ck = document.createElement("input");
+        ck.type = "checkbox";
+        ck.disabled = true;
+        ck.checked = todo[1] !== " ";
+        ck.contentEditable = "false";
+        tli.appendChild(ck);
+        tli.appendChild(document.createTextNode(" " + todo[2]));
+        tlist.appendChild(tli);
+        this.surface.appendChild(tlist);
         i += 1;
         continue;
       }
       if (/^\s*[-*+]\s+/.test(line)) {
-        this.addBlock("ul", line.replace(/^\s*[-*+]\s+/, ""));
+        ol = null;
+        if (!ul) {
+          ul = document.createElement("ul");
+          this.surface.appendChild(ul);
+        }
+        var li = document.createElement("li");
+        li.textContent = line.replace(/^\s*[-*+]\s+/, "");
+        ul.appendChild(li);
         i += 1;
         continue;
       }
       if (/^\s*\d+\.\s+/.test(line)) {
-        this.addBlock("ol", line.replace(/^\s*\d+\.\s+/, ""));
+        ul = null;
+        if (!ol) {
+          ol = document.createElement("ol");
+          this.surface.appendChild(ol);
+        }
+        var oli = document.createElement("li");
+        oli.textContent = line.replace(/^\s*\d+\.\s+/, "");
+        ol.appendChild(oli);
         i += 1;
         continue;
       }
@@ -209,42 +240,76 @@
         i += 1;
         continue;
       }
-      this.addBlock("p", line);
+      closeLists();
+      this.appendEl("p", line);
       i += 1;
     }
-    if (!this.surface.firstChild) this.addBlock("p", "");
+    if (!this.surface.firstElementChild) this.appendEl("p", "");
+    this.syncEmpty();
     this._building = false;
   };
 
   InkEditor.prototype.toMarkdown = function () {
     if (this.mode === "source") return this.source.value;
     var parts = [];
-    var blocks = this.surface.querySelectorAll(".ink-block");
-    var ol = 0;
-    for (var i = 0; i < blocks.length; i++) {
-      var b = blocks[i];
-      var type = b.dataset.type;
-      var t = blockText(b);
-      if (type !== "ol") ol = 0;
-      if (type === "h1") parts.push("# " + t);
-      else if (type === "h2") parts.push("## " + t);
-      else if (type === "h3") parts.push("### " + t);
-      else if (type === "ul") parts.push("- " + t);
-      else if (type === "ol") {
-        ol += 1;
-        parts.push(ol + ". " + t);
-      } else if (type === "todo") {
-        var on = b.querySelector("input") && b.querySelector("input").checked;
-        parts.push("- [" + (on ? "x" : " ") + "] " + t);
-      } else if (type === "quote") parts.push("> " + t);
-      else if (type === "code") parts.push("```\n" + t + "\n```");
-      else if (type === "hr") parts.push("---");
-      else parts.push(t);
-      if (type === "p" || type === "h1" || type === "h2" || type === "h3" || type === "quote" || type === "code" || type === "hr") {
+    var kids = this.surface.children;
+    for (var i = 0; i < kids.length; i++) {
+      var el = kids[i];
+      var tag = el.tagName.toLowerCase();
+      var t = textOf(el);
+      if (tag === "h1") parts.push("# " + t, "");
+      else if (tag === "h2") parts.push("## " + t, "");
+      else if (tag === "h3") parts.push("### " + t, "");
+      else if (tag === "blockquote") parts.push("> " + t, "");
+      else if (tag === "pre") parts.push("```", t, "```", "");
+      else if (tag === "hr") parts.push("---", "");
+      else if (tag === "ul") {
+        var items = el.querySelectorAll("li");
+        for (var u = 0; u < items.length; u++) {
+          var box = items[u].querySelector("input[type=checkbox]");
+          var lt = textOf(items[u]).replace(/^\s+/, "");
+          if (box) parts.push("- [" + (box.checked ? "x" : " ") + "] " + lt);
+          else parts.push("- " + lt);
+        }
+      } else if (tag === "ol") {
+        var oitems = el.querySelectorAll("li");
+        for (var o = 0; o < oitems.length; o++) {
+          parts.push(o + 1 + ". " + textOf(oitems[o]));
+        }
+      } else if (!t.trim()) {
         parts.push("");
+      } else {
+        parts.push(t, "");
       }
     }
     return parts.join("\n").replace(/\n{3,}/g, "\n\n").trim();
+  };
+
+  InkEditor.prototype.syncEmpty = function () {
+    var t = (this.surface.innerText || "").replace(/\u00a0/g, " ").replace(/\n/g, "").trim();
+    this.surface.classList.toggle("is-empty", !t);
+  };
+
+  InkEditor.prototype.normalize = function () {
+    var nodes = Array.from(this.surface.childNodes);
+    for (var i = 0; i < nodes.length; i++) {
+      var n = nodes[i];
+      if (n.nodeType === 3) {
+        if (!n.textContent.trim()) {
+          n.remove();
+          continue;
+        }
+        var wrap = document.createElement("p");
+        wrap.textContent = n.textContent;
+        n.replaceWith(wrap);
+      } else if (n.nodeType === 1 && n.tagName === "DIV") {
+        var p = document.createElement("p");
+        p.innerHTML = n.innerHTML || "<br>";
+        n.replaceWith(p);
+      }
+    }
+    if (!this.surface.firstElementChild) this.appendEl("p", "");
+    this.syncEmpty();
   };
 
   InkEditor.prototype.emit = function () {
@@ -254,13 +319,52 @@
 
   InkEditor.prototype.currentBlock = function () {
     var sel = window.getSelection();
-    if (!sel.anchorNode) return null;
-    var n = sel.anchorNode.nodeType === 1 ? sel.anchorNode : sel.anchorNode.parentElement;
-    return n && n.closest ? n.closest(".ink-block") : null;
+    if (!sel || !sel.anchorNode) return this.surface.firstElementChild;
+    var n = sel.anchorNode;
+    if (n === this.surface) return this.surface.firstElementChild;
+    if (n.nodeType !== 1) n = n.parentElement;
+    while (n && n.parentElement !== this.surface) n = n.parentElement;
+    return n && n.parentElement === this.surface ? n : this.surface.firstElementChild;
+  };
+
+  InkEditor.prototype.convert = function (block, tag) {
+    if (!block) return null;
+    if (tag === "hr") {
+      var hr = this.appendEl("hr", "", block);
+      var next = this.appendEl("p", "", hr);
+      block.remove();
+      placeCaret(next, false);
+      return next;
+    }
+    if (tag === "ul" || tag === "ol" || tag === "todo") {
+      var list = document.createElement(tag === "ol" ? "ol" : "ul");
+      if (tag === "todo") list.dataset.todo = "1";
+      var li = document.createElement("li");
+      if (tag === "todo") {
+        var ck = document.createElement("input");
+        ck.type = "checkbox";
+        ck.disabled = true;
+        ck.contentEditable = "false";
+        li.appendChild(ck);
+        li.appendChild(document.createTextNode(" "));
+      }
+      var inner = textOf(block);
+      li.appendChild(document.createTextNode(inner));
+      list.appendChild(li);
+      block.replaceWith(list);
+      placeCaret(li, true);
+      return list;
+    }
+    if (tag === "code") tag = "pre";
+    if (tag === "quote") tag = "blockquote";
+    var el = document.createElement(tag);
+    el.innerHTML = block.innerHTML || "<br>";
+    block.replaceWith(el);
+    placeCaret(el, true);
+    return el;
   };
 
   InkEditor.prototype.onKey = function (e) {
-    var block = this.currentBlock();
     if (this.slash && !this.slashEl.hidden) {
       if (e.key === "ArrowDown" || e.key === "ArrowUp") {
         e.preventDefault();
@@ -290,53 +394,20 @@
     if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
       e.preventDefault();
       this.toolbar("link");
-      return;
-    }
-    if (!block) return;
-    if (e.key === "Enter" && !e.shiftKey && block.dataset.type !== "code") {
-      e.preventDefault();
-      var next = this.addBlock(block.dataset.type === "h1" || block.dataset.type === "h2" || block.dataset.type === "h3" ? "p" : block.dataset.type, "", block);
-      if (next.dataset.type === "hr") next = this.addBlock("p", "", next);
-      var ed = next.querySelector(".ink-edit");
-      if (ed) placeCaret(ed, false);
-      this.emit();
-      return;
-    }
-    if (e.key === "Backspace") {
-      var ed = block.querySelector(".ink-edit");
-      var empty = !ed || !blockText(block);
-      if (empty && this.surface.children.length > 1 && block.dataset.type !== "p") {
-        e.preventDefault();
-        block.dataset.type = "p";
-        this.emit();
-        return;
-      }
-      if (empty && block.previousSibling && this.surface.children.length > 1) {
-        e.preventDefault();
-        var prev = block.previousSibling;
-        block.remove();
-        var ped = prev.querySelector(".ink-edit");
-        if (ped) placeCaret(ped, true);
-        this.emit();
-      }
     }
   };
 
   InkEditor.prototype.onInput = function () {
+    this.normalize();
     var block = this.currentBlock();
-    if (!block) {
-      this.emit();
-      return;
-    }
-    var raw = blockText(block);
-    if (raw.charAt(0) === "/") {
-      this.showSlash(block, raw.slice(1));
-    } else this.hideSlash();
-    var converted = this.shortcut(block, raw);
-    if (!converted) this.emit();
+    var raw = block ? textOf(block) : "";
+    if (raw.charAt(0) === "/") this.showSlash(block, raw.slice(1));
+    else this.hideSlash();
+    if (!this.shortcut(block, raw)) this.emit();
   };
 
   InkEditor.prototype.shortcut = function (block, raw) {
+    if (!block) return false;
     var map = [
       [/^#\s$/, "h1"],
       [/^##\s$/, "h2"],
@@ -349,14 +420,10 @@
     ];
     for (var i = 0; i < map.length; i++) {
       if (map[i][0].test(raw)) {
-        block.dataset.type = map[i][1];
-        setBlockText(block, "");
-        if (map[i][1] === "hr") {
-          var next = this.addBlock("p", "", block);
-          placeCaret(next.querySelector(".ink-edit"), false);
-        } else {
-          var ed = block.querySelector(".ink-edit");
-          if (ed) placeCaret(ed, false);
+        var el = this.convert(block, map[i][1]);
+        if (el && el.tagName !== "HR") {
+          el.innerHTML = "<br>";
+          placeCaret(el, false);
         }
         this.emit();
         return true;
@@ -386,14 +453,14 @@
           i +
           '"><span>' +
           s.label +
-          '</span><kbd>' +
+          "</span><kbd>" +
           s.hint +
           "</kbd></button>"
         );
       })
       .join("");
     var rootBox = this.root.getBoundingClientRect();
-    var blockBox = block.getBoundingClientRect();
+    var blockBox = (block || this.surface).getBoundingClientRect();
     this.slashEl.style.top = Math.max(40, blockBox.bottom - rootBox.top + 6) + "px";
     this.slashEl.hidden = false;
     var self = this;
@@ -418,18 +485,8 @@
   InkEditor.prototype.pickSlash = function () {
     if (!this.slash || !this.slashBlock) return;
     var item = this.slash[this.slashIndex];
-    var block = this.slashBlock;
-    block.dataset.type = item.type;
-    setBlockText(block, "");
+    this.convert(this.slashBlock, item.type);
     this.hideSlash();
-    if (item.type === "hr") {
-      var next = this.addBlock("p", "", block);
-      var ed = next.querySelector(".ink-edit");
-      if (ed) placeCaret(ed, false);
-    } else {
-      var ed2 = block.querySelector(".ink-edit");
-      if (ed2) placeCaret(ed2, false);
-    }
     this.emit();
   };
 
@@ -441,13 +498,11 @@
 
   InkEditor.prototype.onPaste = function (e) {
     var text = e.clipboardData && e.clipboardData.getData("text/plain");
-    if (!text) return;
+    if (text == null) return;
     e.preventDefault();
-    var block = this.currentBlock();
     if (text.indexOf("\n") >= 0) {
       var md = this.toMarkdown();
-      var extra = text;
-      this.setMarkdown((md ? md + "\n\n" : "") + extra);
+      this.setMarkdown((md ? md + "\n\n" : "") + text);
       this.emit();
       return;
     }
