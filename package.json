@@ -2,6 +2,13 @@
   "name": "cabral.sanz",
   "private": true,
   "description": "Site pessoal de Paulo Cabral Sanz",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
   "devDependencies": {
     "railway": "^3.11.0"
   }
