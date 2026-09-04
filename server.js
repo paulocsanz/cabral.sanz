@@ -246,7 +246,7 @@ function layout({ title, main, mainClass, ogType, ogTitle }) {
     <meta property="og:locale:alternate" content="en" />
     <meta name="twitter:card" content="summary" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="/styles.css?v=5" />
+    <link rel="stylesheet" href="/styles.css?v=6" />
     <script>${LANG_BOOT}</script>
   </head>
   <body>
