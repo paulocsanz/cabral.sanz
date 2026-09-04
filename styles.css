@@ -320,6 +320,7 @@ html:not([lang="en"]) .t-en {
 .post-main > * {
   width: 100%;
   max-width: 38rem;
+  min-width: 0;
 }
 
 .blog-title {
@@ -412,15 +413,16 @@ html:not([lang="en"]) .t-en {
 
 .post-body {
   margin-top: 2.5rem;
-  font-size: 1.08rem;
-  line-height: 1.65;
-  letter-spacing: -0.005em;
+  font-size: 1.125rem;
+  line-height: 1.72;
+  letter-spacing: 0.005em;
   overflow-wrap: break-word;
   text-align: left;
+  text-wrap: pretty;
 }
 
 .post-body p {
-  margin: 0 0 1.2rem;
+  margin: 0 0 1.4rem;
 }
 
 .post-body h2 {
@@ -456,14 +458,16 @@ html:not([lang="en"]) .t-en {
 
 .post-body code {
   font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
-  font-size: 0.88em;
-  color: var(--accent);
+  font-size: 0.9em;
+  color: inherit;
+  letter-spacing: 0;
 }
 
 .post-body pre {
-  margin: 0 0 1.2rem;
-  padding: 0.9rem 1.1rem;
+  margin: 0 0 1.5rem;
+  padding: 1rem 1.15rem;
   border: 1px solid var(--line);
+  background: rgba(243, 238, 228, 0.035);
   max-width: 100%;
   overflow-x: auto;
   white-space: pre-wrap;
@@ -471,6 +475,18 @@ html:not([lang="en"]) .t-en {
 
 .post-body pre code {
   color: var(--ink);
+  background: none;
+  padding: 0;
+  font-size: 0.8rem;
+  line-height: 1.55;
+}
+
+.post-body strong {
+  font-weight: 600;
+}
+
+.post-body em {
+  font-style: italic;
 }
 
 .kicker a {
@@ -506,7 +522,7 @@ html:not([lang="en"]) .t-en {
   }
 
   .post-body {
-    font-size: 1.02rem;
+    font-size: 1.05rem;
   }
 }
 
