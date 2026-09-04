@@ -101,9 +101,21 @@
       </section>
     </main>
 
+    <div id="reauth" class="admin-reauth" hidden>
+      <form id="reauth-form" class="admin-reauth-card">
+        <p>Sessão caiu. O texto continua nesta página — não fecha a aba.</p>
+        <label>
+          Senha
+          <input type="password" id="reauth-password" autocomplete="current-password" required />
+        </label>
+        <button type="submit" class="admin-btn">Entrar de novo</button>
+        <p id="reauth-error" class="admin-error" role="alert" hidden></p>
+      </form>
+    </div>
+
     <script src="/lib/crdt.js"></script>
     <script src="/lib/markdown.js"></script>
-    <script src="/admin/editor.js"></script>
-    <script src="/admin/app.js"></script>
+    <script src="/admin/editor.js?v=2"></script>
+    <script src="/admin/app.js?v=2"></script>
   </body>
 </html>

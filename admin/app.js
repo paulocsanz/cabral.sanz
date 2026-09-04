@@ -11,6 +11,9 @@
     replica: "e" + Math.random().toString(36).slice(2, 6),
   };
   var editors = { pt: null, en: null };
+  var reauthWait = null;
+  var creating = null;
+  var BACKUP_KEY = "cabral.sanz.editor";
   var $ = function (id) {
     return document.getElementById(id);
   };
@@ -19,6 +22,80 @@
     ["login", "list", "edit"].forEach(function (v) {
       $("view-" + v).hidden = v !== view;
     });
+  }
+
+  function writeBackup() {
+    try {
+      localStorage.setItem(
+        BACKUP_KEY,
+        JSON.stringify({
+          slug: $("f-slug").value,
+          date: $("f-date").value,
+          titlePt: $("f-title-pt").value,
+          titleEn: $("f-title-en").value,
+          bodyPt: markdownOf("pt"),
+          bodyEn: markdownOf("en"),
+          isNew: state.isNew,
+          editingSlug: state.editingSlug,
+          ts: Date.now(),
+        }),
+      );
+    } catch (err) {}
+  }
+
+  function readBackup() {
+    try {
+      var raw = localStorage.getItem(BACKUP_KEY);
+      if (!raw) return null;
+      var data = JSON.parse(raw);
+      if (!data || !data.ts) return null;
+      if (Date.now() - data.ts > 7 * 24 * 60 * 60 * 1000) return null;
+      if (!(data.bodyPt || data.bodyEn || data.titlePt)) return null;
+      return data;
+    } catch (err) {
+      return null;
+    }
+  }
+
+  function clearBackup() {
+    try {
+      localStorage.removeItem(BACKUP_KEY);
+    } catch (err) {}
+  }
+
+  function askReauth() {
+    if (reauthWait) return reauthWait;
+    var box = $("reauth");
+    var form = $("reauth-form");
+    var pass = $("reauth-password");
+    var errEl = $("reauth-error");
+    box.hidden = false;
+    errEl.hidden = true;
+    errEl.textContent = "";
+    pass.value = "";
+    setTimeout(function () {
+      pass.focus();
+    }, 0);
+    reauthWait = new Promise(function (resolve, reject) {
+      function onSubmit(event) {
+        event.preventDefault();
+        errEl.hidden = true;
+        api("POST", "/admin/api/login", { password: pass.value })
+          .then(function () {
+            form.removeEventListener("submit", onSubmit);
+            pass.value = "";
+            box.hidden = true;
+            reauthWait = null;
+            resolve();
+          })
+          .catch(function (err) {
+            errEl.textContent = err.message;
+            errEl.hidden = false;
+          });
+      }
+      form.addEventListener("submit", onSubmit);
+    });
+    return reauthWait;
   }
 
   function api(method, path, body) {
@@ -33,6 +110,11 @@
           return {};
         })
         .then(function (data) {
+          if (res.status === 401 && path !== "/admin/api/login") {
+            return askReauth().then(function () {
+              return api(method, path, body);
+            });
+          }
           if (!res.ok) throw new Error(data.error || "Erro " + res.status);
           return data;
         });
@@ -92,14 +174,43 @@
   }
 
   function scheduleDocSave(lang) {
-    if (state.isNew || !state.editingSlug) return;
+    writeBackup();
     $("sync-pill").textContent = "a gravar…";
     clearTimeout(state.saveTimer);
     state.saveTimer = setTimeout(function () {
-      saveDoc(lang).catch(function (err) {
+      persistEditor(lang).catch(function (err) {
         alert_("editor-error", err.message);
       });
     }, 400);
+  }
+
+  function persistEditor(lang) {
+    if (state.isNew) {
+      var slug = $("f-slug").value;
+      var titlePt = $("f-title-pt").value;
+      var titleEn = $("f-title-en").value;
+      if (!slug || !titlePt || !titleEn) {
+        $("sync-pill").textContent = "rascunho local";
+        return Promise.resolve();
+      }
+      if (creating) {
+        return creating.then(function () {
+          return state.editingSlug ? saveDoc(lang) : Promise.resolve();
+        });
+      }
+      creating = saveMeta(true)
+        .then(function (post) {
+          afterSave(post, "");
+          $("sync-pill").textContent = "gravado · rascunho";
+          return post;
+        })
+        .finally(function () {
+          creating = null;
+        });
+      return creating;
+    }
+    if (!state.editingSlug) return Promise.resolve();
+    return saveDoc(lang);
   }
 
   function saveDoc(lang) {
@@ -110,6 +221,7 @@
       replica: state.replica,
     }).then(function (data) {
       $("sync-pill").textContent = "gravado · " + (data.bytes || 0) + " B";
+      clearBackup();
       return data;
     });
   }
@@ -253,6 +365,18 @@
     setLangTab("pt");
     show("edit");
     if (isNew) {
+      var backup = readBackup();
+      if (backup && backup.isNew) {
+        $("f-slug").value = backup.slug || "";
+        $("f-date").value = backup.date || $("f-date").value;
+        $("f-title-pt").value = backup.titlePt || "";
+        $("f-title-en").value = backup.titleEn || "";
+        if (backup.slug) state.slugTouched = true;
+        mountEditors(backup.bodyPt || "", backup.bodyEn || "");
+        $("sync-pill").textContent = "recuperado";
+        scheduleDocSave("pt");
+        return;
+      }
       mountEditors("", "");
       return;
     }
@@ -272,11 +396,16 @@
 
   $("f-slug").addEventListener("input", function () {
     state.slugTouched = true;
+    writeBackup();
   });
   $("f-title-pt").addEventListener("input", function () {
-    if (!state.isNew || state.slugTouched) return;
-    $("f-slug").value = slugify($("f-title-pt").value);
+    if (state.isNew && !state.slugTouched) {
+      $("f-slug").value = slugify($("f-title-pt").value);
+    }
+    writeBackup();
   });
+  $("f-title-en").addEventListener("input", writeBackup);
+  $("f-date").addEventListener("input", writeBackup);
   $("back-link").addEventListener("click", function (event) {
     event.preventDefault();
     openList();
@@ -288,7 +417,9 @@
     $("f-slug").value = post.slug;
     $("f-slug").disabled = true;
     setEditorStatus(post.draft);
-    alert_("editor-ok", message);
+    if (message) alert_("editor-ok", message);
+    else alert_("editor-ok", "");
+    clearBackup();
   }
 
   function saveMeta(draft) {

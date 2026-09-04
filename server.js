@@ -17,6 +17,7 @@ const ROOT = __dirname;
 const DATA_DIR = process.env.DATA_DIR || path.join(ROOT, "data");
 const SEED_FILE = path.join(ROOT, "data", "posts.json");
 const DATA_FILE = path.join(DATA_DIR, "posts.json");
+const SESSION_FILE = path.join(DATA_DIR, "sessions.json");
 const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const MAX_BODY = 2 * 1024 * 1024;
 const LANGS = new Set(["pt", "en"]);
@@ -26,6 +27,37 @@ const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || null;
 
 const sessions = new Map(); // token -> expires (ms)
 const attempts = new Map(); // ip -> { count, resetAt }
+
+function loadSessions() {
+  try {
+    const raw = JSON.parse(fs.readFileSync(SESSION_FILE, "utf8"));
+    if (!raw || typeof raw !== "object") return;
+    const now = Date.now();
+    for (const [token, expires] of Object.entries(raw)) {
+      if (/^[a-f0-9]{64}$/.test(token) && Number(expires) > now) {
+        sessions.set(token, Number(expires));
+      }
+    }
+  } catch {
+    // arquivo ausente ou inválido: começa vazio
+  }
+}
+
+function persistSessions() {
+  try {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+    const now = Date.now();
+    const out = {};
+    for (const [token, expires] of sessions) {
+      if (expires > now) out[token] = expires;
+    }
+    const tmp = SESSION_FILE + ".tmp";
+    fs.writeFileSync(tmp, JSON.stringify(out));
+    fs.renameSync(tmp, SESSION_FILE);
+  } catch (err) {
+    console.error("falha ao gravar sessões", err);
+  }
+}
 
 let writeChain = Promise.resolve();
 
@@ -481,6 +513,7 @@ async function handleApi(req, res, pathname) {
     clearFailures(ip);
     const token = crypto.randomBytes(32).toString("hex");
     sessions.set(token, Date.now() + SESSION_TTL_MS);
+    persistSessions();
     return sendJson(res, 200, { ok: true }, {
       "Set-Cookie": cookieHeader(req, token, SESSION_TTL_MS / 1000),
     });
@@ -489,6 +522,7 @@ async function handleApi(req, res, pathname) {
   if (req.method === "POST" && sub === "/logout") {
     const token = currentSession(req);
     if (token) sessions.delete(token);
+    persistSessions();
     return sendJson(res, 200, { ok: true }, {
       "Set-Cookie": cookieHeader(req, "", 0),
     });
@@ -735,6 +769,7 @@ const server = http.createServer((req, res) => {
 });
 
 ensureStore();
+loadSessions();
 
 server.listen(PORT, () => {
   console.log(`cabral.sanz servindo na porta ${PORT}`);

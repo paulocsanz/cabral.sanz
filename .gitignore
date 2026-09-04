@@ -6,3 +6,4 @@ node_modules/
 !.railway/README.md
 data/docs/
 data/*.tmp
+data/sessions.json
