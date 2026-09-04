@@ -31,7 +31,7 @@ Descoberta: `GET /admin/api/llm`
 5. Substituir o doc: `PUT .../doc/:lang` `{ "markdown": "# …" }` — só quando o GET acabou de acontecer; o servidor faz diff CRDT (prefixo/sufixo).
 6. Preferir **patch find/replace** a PUT inteiro se o humano puder estar digitando.
 7. Meta (título/data/draft): `PUT /admin/api/posts/:slug`.
-8. Publicar: `POST /admin/api/posts/:slug/publish` (exige título+corpo nos dois idiomas).
+8. **Nunca publicar sozinho.** Grava como `draft: true` e manda o link de preview. `POST .../publish` só se o humano disser explicitamente “publica” / “publish”.
 9. Despublicar / apagar: `.../unpublish` e `DELETE /admin/api/posts/:slug`.
 
 Ops cruas (editor): `POST .../doc/:lang/ops` `{ "replica": "lxxxx", "ops": [["i", replica, clock, id, pos, text], ["d", replica, clock, id], ["x", replica, clock, itemId, inner, rightId, rightPos]] }`.

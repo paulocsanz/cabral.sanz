@@ -168,7 +168,7 @@ html:not([lang="en"]) .t-en {
   display: none !important;
 }
 
-body:not(.admin-body) main {
+body:not(.admin-body) main:not(.blog-main):not(.post-main) {
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -184,7 +184,7 @@ body:not(.admin-body) main {
   color: var(--accent);
 }
 
-body:not(.admin-body) h1 {
+body:not(.admin-body) main:not(.blog-main):not(.post-main) h1 {
   margin: 0;
   font-weight: 400;
   font-size: clamp(3.4rem, 12vw, 8.5rem);
@@ -192,7 +192,7 @@ body:not(.admin-body) h1 {
   letter-spacing: -0.045em;
 }
 
-body:not(.admin-body) h1 span {
+body:not(.admin-body) main:not(.blog-main):not(.post-main) h1 span {
   display: block;
 }
 
@@ -249,7 +249,7 @@ body:not(.admin-body) h1 span {
     white-space: normal;
   }
 
-  body:not(.admin-body) main {
+  body:not(.admin-body) main:not(.blog-main):not(.post-main) {
     max-width: none;
     padding-bottom: 2rem;
   }
@@ -305,10 +305,12 @@ body:not(.admin-body) h1 span {
 
 .blog-main,
 .post-main {
+  display: flex;
+  flex-direction: column;
   justify-content: flex-start;
-  max-width: none;
-  padding-top: clamp(1rem, 5vh, 3rem);
-  padding-bottom: 3rem;
+  max-width: 42rem;
+  width: 100%;
+  padding: clamp(1rem, 5vh, 3rem) var(--pad) 3rem;
 }
 
 .blog-title {
