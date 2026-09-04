@@ -17,46 +17,31 @@ const ROOT = __dirname;
 const DATA_DIR = process.env.DATA_DIR || path.join(ROOT, "data");
 const SEED_FILE = path.join(ROOT, "data", "posts.json");
 const DATA_FILE = path.join(DATA_DIR, "posts.json");
-const SESSION_FILE = path.join(DATA_DIR, "sessions.json");
-const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const MAX_BODY = 2 * 1024 * 1024;
 const LANGS = new Set(["pt", "en"]);
 const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || null;
 
-const sessions = new Map(); // token -> expires (ms)
 const attempts = new Map(); // ip -> { count, resetAt }
 
-function loadSessions() {
-  try {
-    const raw = JSON.parse(fs.readFileSync(SESSION_FILE, "utf8"));
-    if (!raw || typeof raw !== "object") return;
-    const now = Date.now();
-    for (const [token, expires] of Object.entries(raw)) {
-      if (/^[a-f0-9]{64}$/.test(token) && Number(expires) > now) {
-        sessions.set(token, Number(expires));
-      }
-    }
-  } catch {
-    // arquivo ausente ou inválido: começa vazio
-  }
+function makeSessionToken() {
+  const exp = String(Date.now() + SESSION_TTL_MS);
+  const payload = "v1." + exp;
+  const sig = crypto.createHmac("sha256", ADMIN_PASSWORD).update(payload).digest("base64url");
+  return payload + "." + sig;
 }
 
-function persistSessions() {
-  try {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
-    const now = Date.now();
-    const out = {};
-    for (const [token, expires] of sessions) {
-      if (expires > now) out[token] = expires;
-    }
-    const tmp = SESSION_FILE + ".tmp";
-    fs.writeFileSync(tmp, JSON.stringify(out));
-    fs.renameSync(tmp, SESSION_FILE);
-  } catch (err) {
-    console.error("falha ao gravar sessões", err);
-  }
+function sessionTokenValid(token) {
+  if (!ADMIN_PASSWORD || typeof token !== "string") return false;
+  const parts = token.split(".");
+  if (parts.length !== 3 || parts[0] !== "v1") return false;
+  const exp = Number(parts[1]);
+  if (!Number.isFinite(exp) || exp < Date.now()) return false;
+  const payload = "v1." + parts[1];
+  const sig = crypto.createHmac("sha256", ADMIN_PASSWORD).update(payload).digest("base64url");
+  return timingSafeEqualStr(sig, parts[2]);
 }
 
 let writeChain = Promise.resolve();
@@ -74,7 +59,13 @@ function parseCookies(req) {
   for (const part of header.split(";")) {
     const idx = part.indexOf("=");
     if (idx === -1) continue;
-    out[part.slice(0, idx).trim()] = decodeURIComponent(part.slice(idx + 1).trim());
+    const key = part.slice(0, idx).trim();
+    const raw = part.slice(idx + 1).trim();
+    try {
+      out[key] = decodeURIComponent(raw);
+    } catch {
+      out[key] = raw;
+    }
   }
   return out;
 }
@@ -94,14 +85,7 @@ function isAuthed(req) {
 
 function currentSession(req) {
   const token = parseCookies(req).admin_session;
-  if (!token || !/^[a-f0-9]{64}$/.test(token)) return null;
-  const expires = sessions.get(token);
-  if (!expires || expires < Date.now()) {
-    sessions.delete(token);
-    return null;
-  }
-  sessions.set(token, Date.now() + SESSION_TTL_MS);
-  return token;
+  return sessionTokenValid(token) ? token : null;
 }
 
 function tooManyAttempts(ip) {
@@ -131,13 +115,24 @@ function timingSafeEqualStr(a, b) {
   return crypto.timingSafeEqual(ha, hb);
 }
 
-function cookieHeader(req, token, maxAge) {
+function isSecureRequest(req) {
   const proto = String(req.headers["x-forwarded-proto"] || "")
     .split(",")[0]
-    .trim();
-  const secure = proto === "https";
+    .trim()
+    .toLowerCase();
+  if (proto === "https") return true;
+  if (req.socket && req.socket.encrypted) return true;
+  const host = String(req.headers.host || "");
+  if (host.startsWith("localhost") || host.startsWith("127.0.0.1") || host.startsWith("[::1]")) {
+    return false;
+  }
+  return proto !== "http";
+}
+
+function cookieHeader(req, token, maxAge) {
   const value = token ? `admin_session=${token}` : "admin_session=";
-  return `${value}; HttpOnly; Path=/; SameSite=Strict; Max-Age=${maxAge}${secure ? "; Secure" : ""}`;
+  const secure = isSecureRequest(req) ? "; Secure" : "";
+  return `${value}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${maxAge}${secure}`;
 }
 
 function ensureStore() {
@@ -511,25 +506,24 @@ async function handleApi(req, res, pathname) {
       return sendJson(res, 401, { error: "Senha incorreta." });
     }
     clearFailures(ip);
-    const token = crypto.randomBytes(32).toString("hex");
-    sessions.set(token, Date.now() + SESSION_TTL_MS);
-    persistSessions();
+    const token = makeSessionToken();
     return sendJson(res, 200, { ok: true }, {
       "Set-Cookie": cookieHeader(req, token, SESSION_TTL_MS / 1000),
     });
   }
 
   if (req.method === "POST" && sub === "/logout") {
-    const token = currentSession(req);
-    if (token) sessions.delete(token);
-    persistSessions();
     return sendJson(res, 200, { ok: true }, {
       "Set-Cookie": cookieHeader(req, "", 0),
     });
   }
 
   if (req.method === "GET" && sub === "/session") {
-    return sendJson(res, 200, { authenticated: Boolean(currentSession(req)) });
+    const token = currentSession(req);
+    const headers = token
+      ? { "Set-Cookie": cookieHeader(req, makeSessionToken(), SESSION_TTL_MS / 1000) }
+      : undefined;
+    return sendJson(res, 200, { authenticated: Boolean(token) }, headers);
   }
 
   if (req.method === "GET" && (sub === "" || sub === "/" || sub === "/llm")) {
@@ -769,7 +763,6 @@ const server = http.createServer((req, res) => {
 });
 
 ensureStore();
-loadSessions();
 
 server.listen(PORT, () => {
   console.log(`cabral.sanz servindo na porta ${PORT}`);

@@ -101,6 +101,7 @@
   function api(method, path, body) {
     return fetch(path, {
       method: method,
+      credentials: "include",
       headers: body ? { "Content-Type": "application/json" } : {},
       body: body ? JSON.stringify(body) : undefined,
     }).then(function (res) {
